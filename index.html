@@ -341,15 +341,15 @@ textarea.inp{resize:none;height:72px;}
 </div><!-- end #app -->
 
 <script>
-// 
-// CONFIG — paste your Apps Script URL here
-// 
+//                                       
+// CONFIG   paste your Apps Script URL here
+//                                       
 var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd98HVYVpC-nRs0d82h5AZxgtPdXEef8SOBYgSXIlJJ8tmaykCKORAhHylduKhSJRP/exec";
 
 var MAIN_CATS = ['Personal','Business','Family'];
 var SK = 'fcm_session';
 
-// Session (not persisted — re-login on refresh)
+// Session (not persisted   re-login on refresh)
 var session = {
   user: null,        // logged-in user object
   data: null,        // full user data from server
@@ -363,7 +363,7 @@ var txnCtx = {accountId:'',accountLabel:'',balance:0};
 var txnIsTransfer=false,txnIsExpense=true,txnMainCat='Personal',txnSubCat='',txnOtherText='';
 var editBalCtx=null,settingCat='Personal',rptCat='all',accType='bank';
 
-// ── Helpers ───────────────────────────────────────────────
+//    Helpers                                                
 function fmt(n){return 'Rs.'+Math.abs(Math.round(Number(n)||0)).toLocaleString('en-IN');}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className=type==='error'?'error':'';t.style.display='block';setTimeout(function(){t.style.display='none';},2800);}
@@ -389,7 +389,7 @@ function dueDateStr(day){
 }
 function nth(d){var s=['th','st','nd','rd'],v=d%100;return s[(v-20)%10]||s[v]||s[0];}
 
-// ── API calls ─────────────────────────────────────────────
+//    API calls                                              
 function apiGet(params, cb) {
   var url = SCRIPT_URL + '?' + Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
   fetch(url).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
@@ -398,7 +398,7 @@ function apiPost(body, cb) {
   fetch(SCRIPT_URL, {method:'POST',body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
 }
 
-// ── Navigation ────────────────────────────────────────────
+//    Navigation                                             
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});
   var el=document.getElementById(id);
@@ -427,7 +427,7 @@ function goBack(){
   else if(prev==='s-family')renderFamily();
 }
 
-// ── LOGIN ─────────────────────────────────────────────────
+//    LOGIN                                                  
 function doLogin(){
   var email=document.getElementById('loginEmail').value.trim().toLowerCase();
   var name=document.getElementById('loginName').value.trim();
@@ -470,7 +470,7 @@ function loadTargetData(targetId,cb){
   });
 }
 
-// ── Get current view data ─────────────────────────────────
+//    Get current view data                                  
 function viewData(){
   if(session.reportTargetId && session.reportTargetId!==session.user.id && session._targetData){
     return session._targetData;
@@ -497,12 +497,12 @@ function dueReminders(){
   });
 }
 
-// ── HOME ──────────────────────────────────────────────────
+//    HOME                                                   
 function renderHome(){
   var d=session.data;if(!d)return;
   var u=session.user;
   var isHead=u.isHead==='true'||u.isHead===true;
-  document.getElementById('homeUsername').textContent=(isHead?'👑 ':'👤 ')+u.name;
+  document.getElementById('homeUsername').textContent=(isHead?'  ':'  ')+u.name;
   document.getElementById('homeModetag').textContent=isHead?'Family Head':'Family Member';
 
   var accs=getAccounts();
@@ -520,17 +520,17 @@ function renderHome(){
 
   var activeRem=(d.reminders||[]).filter(function(r){return r.active==='true'||r.active===true;}).length;
   var dueCount=due.length;
-  var menuHtml='<div class="mi" onclick="go(\'s-accounts\')"><div class="mi-icon" style="background:#E8F5E9">🏦</div><div style="flex:1"><div class="mi-title">Accounts</div><div class="mi-sub">'+((d.accounts||[]).length+1)+' accounts</div></div><div class="mi-arrow">&rsaquo;</div></div>';
-  menuHtml+='<div class="mi" onclick="go(\'s-reports\')"><div class="mi-icon" style="background:#F3E5F5">📈</div><div style="flex:1"><div class="mi-title">Reports</div><div class="mi-sub">Expenses &amp; income</div></div><div class="mi-arrow">&rsaquo;</div></div>';
-  menuHtml+='<div class="mi" onclick="go(\'s-reminders\')"><div class="mi-icon" style="background:#FFF8E1">🔔</div><div style="flex:1"><div class="mi-title">EMI &amp; Reminders</div><div class="mi-sub">'+activeRem+' active</div></div>'+(dueCount>0?'<div class="mi-badge">'+dueCount+' Due</div>':'<div class="mi-arrow">&rsaquo;</div>')+'</div>';
-  if(isHead) menuHtml+='<div class="mi" onclick="go(\'s-family\')"><div class="mi-icon" style="background:#E8F5E9">👨‍👩‍👧</div><div style="flex:1"><div class="mi-title">Manage Family</div><div class="mi-sub">Add &amp; view members</div></div><div class="mi-arrow">&rsaquo;</div></div>';
-  menuHtml+='<div class="mi" onclick="go(\'s-settings\')"><div class="mi-icon" style="background:#FFF3E0">⚙️</div><div style="flex:1"><div class="mi-title">Settings</div><div class="mi-sub">Edit name &middot; Sub-categories</div></div><div class="mi-arrow">&rsaquo;</div></div>';
-  menuHtml+='<div class="mi" onclick="doLogout()"><div class="mi-icon" style="background:#FFEBEE">🚪</div><div style="flex:1"><div class="mi-title" style="color:#D32F2F">Log Out</div><div class="mi-sub">'+u.email+'</div></div></div>';
+  var menuHtml='<div class="mi" onclick="go(\'s-accounts\')"><div class="mi-icon" style="background:#E8F5E9"> </div><div style="flex:1"><div class="mi-title">Accounts</div><div class="mi-sub">'+((d.accounts||[]).length+1)+' accounts</div></div><div class="mi-arrow">&rsaquo;</div></div>';
+  menuHtml+='<div class="mi" onclick="go(\'s-reports\')"><div class="mi-icon" style="background:#F3E5F5"> </div><div style="flex:1"><div class="mi-title">Reports</div><div class="mi-sub">Expenses &amp; income</div></div><div class="mi-arrow">&rsaquo;</div></div>';
+  menuHtml+='<div class="mi" onclick="go(\'s-reminders\')"><div class="mi-icon" style="background:#FFF8E1"> </div><div style="flex:1"><div class="mi-title">EMI &amp; Reminders</div><div class="mi-sub">'+activeRem+' active</div></div>'+(dueCount>0?'<div class="mi-badge">'+dueCount+' Due</div>':'<div class="mi-arrow">&rsaquo;</div>')+'</div>';
+  if(isHead) menuHtml+='<div class="mi" onclick="go(\'s-family\')"><div class="mi-icon" style="background:#E8F5E9">     </div><div style="flex:1"><div class="mi-title">Manage Family</div><div class="mi-sub">Add &amp; view members</div></div><div class="mi-arrow">&rsaquo;</div></div>';
+  menuHtml+='<div class="mi" onclick="go(\'s-settings\')"><div class="mi-icon" style="background:#FFF3E0">  </div><div style="flex:1"><div class="mi-title">Settings</div><div class="mi-sub">Edit name &middot; Sub-categories</div></div><div class="mi-arrow">&rsaquo;</div></div>';
+  menuHtml+='<div class="mi" onclick="doLogout()"><div class="mi-icon" style="background:#FFEBEE"> </div><div style="flex:1"><div class="mi-title" style="color:#D32F2F">Log Out</div><div class="mi-sub">'+u.email+'</div></div></div>';
   document.getElementById('homeMenu').innerHTML=menuHtml;
 }
 function doLogout(){session={user:null,data:null,familyData:null,reportTargetId:null};document.getElementById('loginEmail').value='';document.getElementById('loginName').value='';go('s-login',true);showToast('Logged out');}
 
-// ── ACCOUNTS ──────────────────────────────────────────────
+//    ACCOUNTS                                               
 function renderAccounts(){
   var d=session.data;if(!d)return;
   var accs=getAccounts();
@@ -539,15 +539,15 @@ function renderAccounts(){
   var cash=Number((d.user&&d.user.cashOnHand)||0);
   var html='';
   if(banks.length>0){
-    html+='<div class="sec-hdr">🏦 Bank Accounts</div>';
-    banks.forEach(function(b){html+='<div class="ar"><div class="ar-icon" style="background:#E8F5E9">🏦</div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">'+b.label.split(' ...')[0]+'</div><div style="font-size:10px;color:#90A4AE">...'+b.label.split('...')[1]+'</div></div><div style="font-size:14px;font-weight:900;color:#1B5E20;margin-right:6px">'+fmt(b.balance)+'</div><button class="ar-edit" onclick="openEditBal(\'bank\',\''+b.id+'\')">Edit</button><button class="ar-plus" onclick="openTxn(\''+b.id+'\',\''+b.label+'\','+b.balance+')">+</button></div>';});
+    html+='<div class="sec-hdr">  Bank Accounts</div>';
+    banks.forEach(function(b){html+='<div class="ar"><div class="ar-icon" style="background:#E8F5E9"> </div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">'+b.label.split(' ...')[0]+'</div><div style="font-size:10px;color:#90A4AE">...'+b.label.split('...')[1]+'</div></div><div style="font-size:14px;font-weight:900;color:#1B5E20;margin-right:6px">'+fmt(b.balance)+'</div><button class="ar-edit" onclick="openEditBal(\'bank\',\''+b.id+'\')">Edit</button><button class="ar-plus" onclick="openTxn(\''+b.id+'\',\''+b.label+'\','+b.balance+')">+</button></div>';});
   }
   if(cards.length>0){
-    html+='<div class="sec-hdr">💳 Credit Cards</div>';
-    cards.forEach(function(c){html+='<div class="ar"><div class="ar-icon" style="background:#FFEBEE">💳</div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">'+c.label.split(' ...')[0]+'</div><div style="font-size:10px;color:#90A4AE">...'+c.label.split('...')[1]+'</div></div><div style="font-size:14px;font-weight:900;color:'+(c.balance<0?'#D32F2F':'#1B5E20')+';margin-right:6px">'+(c.balance<0?'-':'')+fmt(c.balance)+'</div><button class="ar-edit" onclick="openEditBal(\'card\',\''+c.id+'\')">Edit</button><button class="ar-plus" onclick="openTxn(\''+c.id+'\',\''+c.label+'\','+c.balance+')">+</button></div>';});
+    html+='<div class="sec-hdr">  Credit Cards</div>';
+    cards.forEach(function(c){html+='<div class="ar"><div class="ar-icon" style="background:#FFEBEE"> </div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">'+c.label.split(' ...')[0]+'</div><div style="font-size:10px;color:#90A4AE">...'+c.label.split('...')[1]+'</div></div><div style="font-size:14px;font-weight:900;color:'+(c.balance<0?'#D32F2F':'#1B5E20')+';margin-right:6px">'+(c.balance<0?'-':'')+fmt(c.balance)+'</div><button class="ar-edit" onclick="openEditBal(\'card\',\''+c.id+'\')">Edit</button><button class="ar-plus" onclick="openTxn(\''+c.id+'\',\''+c.label+'\','+c.balance+')">+</button></div>';});
   }
-  html+='<div class="sec-hdr">💵 Cash on Hand</div><div class="ar"><div class="ar-icon" style="background:#E8F5E9">💵</div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">Cash</div><div style="font-size:10px;color:#90A4AE">Always available</div></div><div style="font-size:14px;font-weight:900;color:#1B5E20;margin-right:6px">'+fmt(cash)+'</div><button class="ar-edit" onclick="openEditBal(\'cash\',\'cash\')">Edit</button><button class="ar-plus" onclick="openTxn(\'cash\',\'Cash on Hand\','+cash+')">+</button></div>';
-  if(banks.length===0&&cards.length===0)html+='<div class="empty"><div class="ico">🏦</div><div class="etitle">No accounts yet</div><div class="esub">Tap + Add above</div></div>';
+  html+='<div class="sec-hdr">  Cash on Hand</div><div class="ar"><div class="ar-icon" style="background:#E8F5E9"> </div><div style="flex:1"><div style="font-size:13px;font-weight:800;color:#1B5E20">Cash</div><div style="font-size:10px;color:#90A4AE">Always available</div></div><div style="font-size:14px;font-weight:900;color:#1B5E20;margin-right:6px">'+fmt(cash)+'</div><button class="ar-edit" onclick="openEditBal(\'cash\',\'cash\')">Edit</button><button class="ar-plus" onclick="openTxn(\'cash\',\'Cash on Hand\','+cash+')">+</button></div>';
+  if(banks.length===0&&cards.length===0)html+='<div class="empty"><div class="ico"> </div><div class="etitle">No accounts yet</div><div class="esub">Tap + Add above</div></div>';
   document.getElementById('accountsList').innerHTML=html;
 }
 function selectAccType(type){accType=type;['bank','card','cash'].forEach(function(t){document.getElementById('chip-'+t).className='chip'+(t===type?' on':'');});document.getElementById('accNameFields').style.display=type==='cash'?'none':'block';document.getElementById('accCardHint').style.display=type==='card'?'block':'none';}
@@ -602,7 +602,7 @@ function saveEditBal(){
   }
 }
 
-// ── TRANSACTION ───────────────────────────────────────────
+//    TRANSACTION                                            
 function openTxn(accountId,accountLabel,balance){txnCtx={accountId:accountId,accountLabel:accountLabel,balance:balance};txnIsTransfer=false;txnIsExpense=true;txnMainCat='Personal';txnSubCat='';txnOtherText='';go('s-newTxn');}
 function renderTxnForm(){
   document.getElementById('txnAccLabel').textContent=txnCtx.accountLabel;
@@ -654,7 +654,7 @@ function saveTxn(){
   });
 }
 
-// ── REMINDERS ─────────────────────────────────────────────
+//    REMINDERS                                              
 function toggleAddReminder(){
   var f=document.getElementById('addReminderForm');f.style.display=f.style.display==='none'?'block':'none';
   if(f.style.display==='block'){
@@ -687,7 +687,7 @@ function renderReminders(){
     });
   }
   html+='<div class="sec-hdr">All Reminders</div>';
-  if(reminders.length===0)html+='<div class="empty"><div class="ico">🔔</div><div class="etitle">No reminders yet</div><div class="esub">Tap + Add above</div></div>';
+  if(reminders.length===0)html+='<div class="empty"><div class="ico"> </div><div class="etitle">No reminders yet</div><div class="esub">Tap + Add above</div></div>';
   var rest=reminders.filter(function(r){var dd=workingDaysUntil(r.dueDay);var isActive=r.active==='true'||r.active===true;return!(isActive&&dd>=0&&dd<=2);});
   rest.forEach(function(r){
     var acc=accs.find(function(a){return a.id===r.accountId;});
@@ -720,7 +720,7 @@ function deleteRem(rid){
   });
 }
 
-// ── REPORTS ───────────────────────────────────────────────
+//    REPORTS                                                
 var rptViewData=null;
 function initReports(){
   session.reportTargetId=null;rptViewData=null;
@@ -731,14 +731,14 @@ function initReports(){
   var memSel=document.getElementById('rptMemberSelector');
   if(isHead&&session.familyData&&session.familyData.length>1){
     memSel.style.display='block';
-    document.getElementById('rptMemberChips').innerHTML=session.familyData.map(function(m){return '<div class="chip'+((!session.reportTargetId&&m.id===session.user.id)||session.reportTargetId===m.id?' on':'')+'" onclick="setRptMember(\''+m.id+'\')">'+(m.isHead==='true'?'👑 ':'')+m.name+'</div>';}).join('');
+    document.getElementById('rptMemberChips').innerHTML=session.familyData.map(function(m){return '<div class="chip'+((!session.reportTargetId&&m.id===session.user.id)||session.reportTargetId===m.id?' on':'')+'" onclick="setRptMember(\''+m.id+'\')">'+(m.isHead==='true'?'  ':'')+m.name+'</div>';}).join('');
   }else memSel.style.display='none';
   rptViewData=session.data;
   refreshRptAccounts();renderRptCatChips();renderReports();
 }
 function setRptMember(memberId){
   session.reportTargetId=memberId;
-  document.getElementById('rptMemberChips').innerHTML=(session.familyData||[]).map(function(m){return '<div class="chip'+(session.reportTargetId===m.id?' on':'')+'" onclick="setRptMember(\''+m.id+'\')">'+(m.isHead==='true'?'👑 ':'')+m.name+'</div>';}).join('');
+  document.getElementById('rptMemberChips').innerHTML=(session.familyData||[]).map(function(m){return '<div class="chip'+(session.reportTargetId===m.id?' on':'')+'" onclick="setRptMember(\''+m.id+'\')">'+(m.isHead==='true'?'  ':'')+m.name+'</div>';}).join('');
   if(memberId===session.user.id){rptViewData=session.data;refreshRptAccounts();renderReports();}
   else{loadTargetData(memberId,function(d){rptViewData=d;refreshRptAccounts();renderReports();});}
 }
@@ -760,15 +760,15 @@ function renderReports(){
   var entries=Object.keys(catMap).map(function(k){return[k,catMap[k]];}).sort(function(a,b){return a[1]-b[1];});
   document.getElementById('rptCatBreak').innerHTML=entries.length>0?'<div class="card"><div class="card-title">By Category</div>'+entries.map(function(e){return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E8F5E9"><div style="font-size:13px;font-weight:700;color:#546E7A">'+e[0]+'</div><div style="font-size:13px;font-weight:800;color:'+(e[1]<0?'#D32F2F':'#2E7D32')+'">'+(e[1]<0?'-':'+')+fmt(e[1])+'</div></div>';}).join('')+'</div>':'';
   var accs=getAccounts(d);
-  document.getElementById('rptTxns').innerHTML='<div class="sec-hdr">Transactions ('+txns.length+')</div>'+(txns.length===0?'<div class="empty"><div class="ico">📊</div><div class="etitle">No transactions</div></div>':txns.map(function(t){var acc=accs.find(function(a){return a.id===t.fromAccountId;});return '<div class="txn-row"><div><div style="font-size:13px;font-weight:700;color:#1B5E20">'+t.subCat+'</div><div style="font-size:10px;color:#90A4AE">'+(acc?acc.label:'Cash')+' - '+t.date+'</div>'+(t.note?'<div style="font-size:10px;color:#90A4AE;font-style:italic">'+t.note+'</div>':'')+'</div><div style="font-size:13px;font-weight:800;color:'+(Number(t.amount)<0?'#D32F2F':'#2E7D32')+'">'+(Number(t.amount)<0?'-':'+')+fmt(t.amount)+'</div></div>';}).join(''));
+  document.getElementById('rptTxns').innerHTML='<div class="sec-hdr">Transactions ('+txns.length+')</div>'+(txns.length===0?'<div class="empty"><div class="ico"> </div><div class="etitle">No transactions</div></div>':txns.map(function(t){var acc=accs.find(function(a){return a.id===t.fromAccountId;});return '<div class="txn-row"><div><div style="font-size:13px;font-weight:700;color:#1B5E20">'+t.subCat+'</div><div style="font-size:10px;color:#90A4AE">'+(acc?acc.label:'Cash')+' - '+t.date+'</div>'+(t.note?'<div style="font-size:10px;color:#90A4AE;font-style:italic">'+t.note+'</div>':'')+'</div><div style="font-size:13px;font-weight:800;color:'+(Number(t.amount)<0?'#D32F2F':'#2E7D32')+'">'+(Number(t.amount)<0?'-':'+')+fmt(t.amount)+'</div></div>';}).join(''));
 }
 
-// ── MANAGE FAMILY ─────────────────────────────────────────
+//    MANAGE FAMILY                                          
 function renderFamily(){
   var fd=session.familyData;
   var html='';
-  if(!fd||fd.length===0){html='<div class="empty"><div class="ico">👨‍👩‍👧</div><div class="etitle">No members yet</div></div>';}
-  else{fd.forEach(function(m){var nw=Number(m.netWorth)||0;html+='<div class="mem-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">'+(m.isHead==='true'?'👑':'👤')+'</div><div style="flex:1"><div style="font-size:14px;font-weight:800;color:#1B5E20">'+m.name+(m.isHead==='true'?' <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:100px">Head</span>':'')+'</div><div style="font-size:11px;color:#90A4AE">'+m.email+'</div></div><div style="text-align:right"><div style="font-size:10px;color:#90A4AE">Net Worth</div><div style="font-size:16px;font-weight:900;color:'+(nw<0?'#D32F2F':'#1B5E20')+'">'+(nw<0?'-':'')+fmt(nw)+'</div></div></div><div style="display:flex;gap:16px;border-top:1px solid #E8F5E9;padding-top:8px"><div><div style="font-size:10px;color:#90A4AE">Banks</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.banks)+'</div></div><div><div style="font-size:10px;color:#90A4AE">CC Debt</div><div style="font-size:12px;font-weight:800;color:#D32F2F">'+fmt(m.cards)+'</div></div><div><div style="font-size:10px;color:#90A4AE">Cash</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.cash)+'</div></div></div>'+(m.isHead!=='true'?'<button onclick="removeMember(\''+m.id+'\',\''+m.name+'\')" style="margin-top:10px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:9px;padding:7px 14px;color:#D32F2F;font-size:12px;font-weight:700;cursor:pointer;width:100%">Remove Member</button>':'')+'</div>';});}
+  if(!fd||fd.length===0){html='<div class="empty"><div class="ico">     </div><div class="etitle">No members yet</div></div>';}
+  else{fd.forEach(function(m){var nw=Number(m.netWorth)||0;html+='<div class="mem-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">'+(m.isHead==='true'?' ':' ')+'</div><div style="flex:1"><div style="font-size:14px;font-weight:800;color:#1B5E20">'+m.name+(m.isHead==='true'?' <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:100px">Head</span>':'')+'</div><div style="font-size:11px;color:#90A4AE">'+m.email+'</div></div><div style="text-align:right"><div style="font-size:10px;color:#90A4AE">Net Worth</div><div style="font-size:16px;font-weight:900;color:'+(nw<0?'#D32F2F':'#1B5E20')+'">'+(nw<0?'-':'')+fmt(nw)+'</div></div></div><div style="display:flex;gap:16px;border-top:1px solid #E8F5E9;padding-top:8px"><div><div style="font-size:10px;color:#90A4AE">Banks</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.banks)+'</div></div><div><div style="font-size:10px;color:#90A4AE">CC Debt</div><div style="font-size:12px;font-weight:800;color:#D32F2F">'+fmt(m.cards)+'</div></div><div><div style="font-size:10px;color:#90A4AE">Cash</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.cash)+'</div></div></div>'+(m.isHead!=='true'?'<button onclick="removeMember(\''+m.id+'\',\''+m.name+'\')" style="margin-top:10px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:9px;padding:7px 14px;color:#D32F2F;font-size:12px;font-weight:700;cursor:pointer;width:100%">Remove Member</button>':'')+'</div>';});}
   document.getElementById('familyMembersList').innerHTML=html;
 }
 function saveMember(){
@@ -791,7 +791,7 @@ function removeMember(id,name){
   });
 }
 
-// ── SETTINGS ──────────────────────────────────────────────
+//    SETTINGS                                               
 function renderSettings(){document.getElementById('settingName').value='';settingCat='Personal';renderSettingCatChips();renderSubCatList();}
 function renderSettingCatChips(){document.getElementById('settingCatChips').innerHTML=MAIN_CATS.map(function(c){return '<div class="chip'+(c===settingCat?' on':'')+'" onclick="setSettingCat(\''+c+'\')">'+c+'</div>';}).join('');}
 function setSettingCat(cat){settingCat=cat;renderSettingCatChips();renderSubCatList();}
@@ -801,7 +801,7 @@ function saveName(){
   apiPost({action:'updateName',userId:session.user.id,name:n},function(err,res){
     hideLoader();if(err||res.status!=='ok'){showToast('Failed','error');return;}
     session.user.name=n;if(session.data&&session.data.user)session.data.user.name=n;
-    showToast('Name updated!');document.getElementById('homeUsername').textContent=(session.user.isHead==='true'?'👑 ':'👤 ')+n;
+    showToast('Name updated!');document.getElementById('homeUsername').textContent=(session.user.isHead==='true'?'  ':'  ')+n;
   });
 }
 function addSubCat(){
@@ -824,7 +824,7 @@ function renderSubCatList(){
   document.getElementById('subCatList').innerHTML=MAIN_CATS.map(function(cat){var cats=(d.subCategories&&d.subCategories[cat])||[];return '<div class="card"><div class="card-title">'+cat+'</div><div class="chips">'+cats.map(function(s){return '<div style="display:flex;align-items:center;gap:4px;background:'+(s==='Other'?'#E8F5E9':'#C8E6C9')+';border-radius:100px;padding:5px 12px;border:1px solid #C8E6C9"><span style="font-size:12px;font-weight:700;color:#2E7D32">'+s+'</span>'+(s!=='Other'?'<button onclick="removeSubCat(\''+cat+'\',\''+s+'\')" style="background:none;border:none;color:#D32F2F;font-size:15px;cursor:pointer;padding:0 0 0 3px;line-height:1">x</button>':'')+'</div>';}).join('')+'</div></div>';}).join('');
 }
 
-// ── INIT ──────────────────────────────────────────────────
+//    INIT                                                   
 window.onload=function(){
   setTimeout(function(){
     document.getElementById('splash').style.display='none';
