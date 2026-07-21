@@ -130,12 +130,19 @@ textarea.inp{resize:none;height:72px;}
     <div style="font-size:22px;font-weight:900;color:#fff;margin-top:10px">Family Cash Manager</div>
     <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px">One family, all accounts</div>
   </div>
-  <div class="card">
+  <div class="card" id="login-step1">
     <div class="card-title">Sign In</div>
     <div class="fg"><label class="lbl">Gmail ID *</label><input class="inp" type="email" id="loginEmail" placeholder="yourname@gmail.com"/></div>
     <div class="fg"><label class="lbl">Display Name (first time only)</label><input class="inp" type="text" id="loginName" placeholder="e.g. Rahul / Dad / Priya"/></div>
-    <button class="btn-primary" onclick="doLogin()">Continue</button>
+    <button class="btn-primary" id="loginContinueBtn" onclick="doLogin()">Continue</button>
     <div style="font-size:11px;color:#90A4AE;text-align:center;margin-top:10px;font-weight:600">Only your Gmail can access your data</div>
+  </div>
+  <div class="card" id="login-step2" style="display:none">
+    <div class="card-title">📧 Check your email</div>
+    <div style="font-size:12px;color:#607D8B;margin-bottom:10px">We've emailed a 6-digit code to confirm it's really you.</div>
+    <div class="fg"><label class="lbl">Code from email</label><input class="inp" type="text" id="loginOtp" maxlength="6" placeholder="6-digit code"/></div>
+    <button class="btn-primary" id="loginVerifyBtn" onclick="verifyLoginOtp()">Verify & Continue</button>
+    <div style="font-size:11px;color:#90A4AE;text-align:center;margin-top:10px;cursor:pointer" onclick="backToLoginStep1()">← Use a different email</div>
   </div>
   <div class="warn">First person to sign in becomes Family Head</div>
 </div>
@@ -427,7 +434,8 @@ function goBack(){
   else if(prev==='s-family')renderFamily();
 }
 
-//    LOGIN                                                  
+//    LOGIN
+var _loginEmail='';
 function doLogin(){
   var email=document.getElementById('loginEmail').value.trim().toLowerCase();
   var name=document.getElementById('loginName').value.trim();
@@ -436,6 +444,23 @@ function doLogin(){
   apiPost({action:'login',email:email,name:name},function(err,res){
     hideLoader();
     if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Login failed','error');return;}
+    _loginEmail=email;
+    document.getElementById('login-step1').style.display='none';
+    document.getElementById('login-step2').style.display='block';
+    document.getElementById('loginOtp').value='';
+  });
+}
+function backToLoginStep1(){
+  document.getElementById('login-step2').style.display='none';
+  document.getElementById('login-step1').style.display='block';
+}
+function verifyLoginOtp(){
+  var otp=document.getElementById('loginOtp').value.trim();
+  if(!/^[0-9]{6}$/.test(otp)){showToast('Enter the 6-digit code from your email','error');return;}
+  showLoader();
+  apiPost({action:'verifyLoginOtp',email:_loginEmail,otp:otp},function(err,res){
+    hideLoader();
+    if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Verification failed','error');return;}
     session.user=res.data;
     loadUserData(function(){
       go('s-home',true);
