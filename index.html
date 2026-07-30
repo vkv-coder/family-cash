@@ -104,7 +104,7 @@ textarea.inp{resize:none;height:72px;}
 <div class="modal" id="editBalModal">
   <div class="modal-box">
     <div style="font-size:15px;font-weight:800;color:#1B5E20;margin-bottom:14px" id="editBalTitle">Edit Balance</div>
-    <div class="fg"><label class="lbl">Balance (Rs.)</label><input class="inp" type="number" id="editBalInput"/></div>
+    <div class="fg"><label class="lbl">Balance (<span class="cur-label">Rs.</span>)</label><input class="inp" type="number" id="editBalInput"/></div>
     <div id="editBalHint" style="font-size:11px;color:#90A4AE;margin-bottom:12px;display:none">Use negative for CC dues e.g. -15000</div>
     <div class="row"><button class="btn-primary" style="flex:1" onclick="saveEditBal()">Update</button><button class="btn-sec" onclick="closeModal('editBalModal')" style="margin-left:8px">Cancel</button></div>
   </div>
@@ -197,7 +197,7 @@ textarea.inp{resize:none;height:72px;}
       <div class="fg"><label class="lbl">Name *</label><input class="inp" id="accName" placeholder="e.g. HDFC / SBI"/></div>
       <div class="fg"><label class="lbl">Last 4 Digits</label><input class="inp" id="accLast4" maxlength="4" placeholder="1234"/></div>
     </div>
-    <div class="fg"><label class="lbl">Current Balance (Rs.) *</label><input class="inp" type="number" id="accBalance" placeholder="0"/></div>
+    <div class="fg"><label class="lbl">Current Balance (<span class="cur-label">Rs.</span>) *</label><input class="inp" type="number" id="accBalance" placeholder="0"/></div>
     <div id="accCardHint" class="warn" style="display:none">Use negative for CC dues e.g. -15000</div>
     <div class="row" style="margin-top:4px">
       <button class="btn-primary" style="flex:1" onclick="saveAccount()">Save Account</button>
@@ -215,7 +215,7 @@ textarea.inp{resize:none;height:72px;}
   </div>
   <div class="card">
     <div class="fg"><label class="lbl">Date</label><input class="inp" type="date" id="txnDate"/></div>
-    <div class="fg"><label class="lbl">Amount (Rs.) *</label><input class="inp" type="number" id="txnAmount" placeholder="0.00"/></div>
+    <div class="fg"><label class="lbl">Amount (<span class="cur-label">Rs.</span>) *</label><input class="inp" type="number" id="txnAmount" placeholder="0.00"/></div>
     <div class="fg">
       <div style="font-size:14px;font-weight:900;color:#2E7D32;margin-bottom:6px">Transfer</div>
       <div class="tog-row">
@@ -364,6 +364,28 @@ var DEMO_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7HpAgwCAGb8AoZO
 var isDemo = new URLSearchParams(location.search).get('demo') === '1';
 var SCRIPT_URL = isDemo ? DEMO_SCRIPT_URL : PROD_SCRIPT_URL;
 
+// Demo-only currency auto-detection (UK/international showcase). Real
+// production data stays in actual Rupees regardless of browser locale —
+// this only affects the illustrative demo, based on the visitor's own
+// browser/OS locale setting (not true IP geolocation, so it's an
+// approximation, not a guarantee of the visitor's real location).
+var CURRENCY_BY_REGION = {
+  GB:{symbol:'£',locale:'en-GB'}, US:{symbol:'$',locale:'en-US'}, CA:{symbol:'C$',locale:'en-CA'},
+  AU:{symbol:'A$',locale:'en-AU'}, IN:{symbol:'Rs.',locale:'en-IN'}, NZ:{symbol:'NZ$',locale:'en-NZ'},
+  SG:{symbol:'S$',locale:'en-SG'}, AE:{symbol:'AED ',locale:'en-AE'}
+};
+var EU_REGIONS = ['DE','FR','IT','ES','NL','IE','PT','BE','AT','FI','GR','LU','SK','SI','EE','LV','LT','CY','MT'];
+function detectDemoCurrency(){
+  try{
+    var loc = navigator.language || 'en-US';
+    var region = (loc.split('-')[1] || '').toUpperCase();
+    if (CURRENCY_BY_REGION[region]) return CURRENCY_BY_REGION[region];
+    if (EU_REGIONS.indexOf(region) >= 0) return {symbol:'€',locale:loc};
+    return {symbol:'$',locale:'en-US'}; // international default
+  }catch(e){ return {symbol:'Rs.',locale:'en-IN'}; }
+}
+var DEMO_CURRENCY = isDemo ? detectDemoCurrency() : null;
+
 var MAIN_CATS = ['Personal','Business','Family'];
 var SK = 'fcm_session';
 
@@ -383,7 +405,11 @@ var txnIsTransfer=false,txnIsExpense=true,txnMainCat='Personal',txnSubCat='',txn
 var editBalCtx=null,settingCat='Personal',rptCat='all',accType='bank';
 
 //    Helpers                                                
-function fmt(n){return 'Rs.'+Math.abs(Math.round(Number(n)||0)).toLocaleString('en-IN');}
+function fmt(n){
+  var amt = Math.abs(Math.round(Number(n)||0));
+  if (isDemo && DEMO_CURRENCY) return DEMO_CURRENCY.symbol + amt.toLocaleString(DEMO_CURRENCY.locale);
+  return 'Rs.'+amt.toLocaleString('en-IN');
+}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function showToast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className=type==='error'?'error':'';t.style.display='block';setTimeout(function(){t.style.display='none';},2800);}
 function showLoader(){document.getElementById('loader').classList.add('show');}
@@ -871,6 +897,7 @@ window.onload=function(){
   if (isDemo) {
     document.getElementById('demo-entry').style.display='block';
     document.getElementById('login-step1').style.display='none';
+    document.querySelectorAll('.cur-label').forEach(function(el){ el.textContent = DEMO_CURRENCY.symbol.trim(); });
   }
   setTimeout(function(){
     document.getElementById('splash').style.display='none';
