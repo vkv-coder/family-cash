@@ -130,12 +130,19 @@ textarea.inp{resize:none;height:72px;}
     <div style="font-size:22px;font-weight:900;color:#fff;margin-top:10px">Family Cash Manager</div>
     <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px">One family, all accounts</div>
   </div>
+  <div class="card" id="demo-entry" style="display:none">
+    <div style="background:#FFF3E0;color:#E65100;font-weight:800;font-size:12px;text-align:center;padding:6px;border-radius:6px;margin-bottom:12px">🧪 DEMO MODE — sample data, resets nightly</div>
+    <div class="card-title">Try Family Cash Manager</div>
+    <div style="font-size:12px;color:#607D8B;margin-bottom:10px">Jump straight into a sample family's dashboard — no sign-up needed.</div>
+    <button class="btn-primary" onclick="tryDemoLogin()">Enter Demo</button>
+  </div>
   <div class="card" id="login-step1">
     <div class="card-title">Sign In</div>
     <div class="fg"><label class="lbl">Gmail ID *</label><input class="inp" type="email" id="loginEmail" placeholder="yourname@gmail.com"/></div>
     <div class="fg"><label class="lbl">Display Name (first time only)</label><input class="inp" type="text" id="loginName" placeholder="e.g. Rahul / Dad / Priya"/></div>
     <button class="btn-primary" id="loginContinueBtn" onclick="doLogin()">Continue</button>
     <div style="font-size:11px;color:#90A4AE;text-align:center;margin-top:10px;font-weight:600">Only your Gmail can access your data</div>
+    <div style="font-size:12px;color:#2E7D32;text-align:center;margin-top:14px;font-weight:700;cursor:pointer" onclick="location.href=location.pathname+'?demo=1'">Want to try it first? View Demo →</div>
   </div>
   <div class="card" id="login-step2" style="display:none">
     <div class="card-title">📧 Check your email</div>
@@ -351,7 +358,11 @@ textarea.inp{resize:none;height:72px;}
 //                                       
 // CONFIG   paste your Apps Script URL here
 //                                       
-var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd98HVYVpC-nRs0d82h5AZxgtPdXEef8SOBYgSXIlJJ8tmaykCKORAhHylduKhSJRP/exec";
+var PROD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd98HVYVpC-nRs0d82h5AZxgtPdXEef8SOBYgSXIlJJ8tmaykCKORAhHylduKhSJRP/exec";
+// Paste the demo Apps Script's own /exec URL here once deployed (see family-cash-demo-backend.gs).
+var DEMO_SCRIPT_URL = "PASTE_DEMO_SCRIPT_URL_HERE";
+var isDemo = new URLSearchParams(location.search).get('demo') === '1';
+var SCRIPT_URL = isDemo ? DEMO_SCRIPT_URL : PROD_SCRIPT_URL;
 
 var MAIN_CATS = ['Personal','Business','Family'];
 var SK = 'fcm_session';
@@ -359,6 +370,7 @@ var SK = 'fcm_session';
 // Session (not persisted   re-login on refresh)
 var session = {
   user: null,        // logged-in user object
+  token: null,       // server-issued session token (v4) — proves who you are
   data: null,        // full user data from server
   familyData: null,  // family summary (Head only)
   reportTargetId: null // Head can view other members
@@ -398,11 +410,15 @@ function nth(d){var s=['th','st','nd','rd'],v=d%100;return s[(v-20)%10]||s[v]||s
 
 //    API calls                                              
 function apiGet(params, cb) {
-  var url = SCRIPT_URL + '?' + Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
+  var p = Object.assign({}, params);
+  if (session.token && !p.token) p.token = session.token;
+  var url = SCRIPT_URL + '?' + Object.keys(p).map(function(k){return k+'='+encodeURIComponent(p[k]);}).join('&');
   fetch(url).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
 }
 function apiPost(body, cb) {
-  fetch(SCRIPT_URL, {method:'POST',body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
+  var b = Object.assign({}, body);
+  if (session.token && !b.token) b.token = session.token;
+  fetch(SCRIPT_URL, {method:'POST',body:JSON.stringify(b)}).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
 }
 
 //    Navigation                                             
@@ -462,6 +478,7 @@ function verifyLoginOtp(){
     hideLoader();
     if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Verification failed','error');return;}
     session.user=res.data;
+    session.token=res.data.token;
     loadUserData(function(){
       go('s-home',true);
       showToast('Welcome, '+session.user.name+'!');
@@ -553,7 +570,7 @@ function renderHome(){
   menuHtml+='<div class="mi" onclick="doLogout()"><div class="mi-icon" style="background:#FFEBEE"> </div><div style="flex:1"><div class="mi-title" style="color:#D32F2F">Log Out</div><div class="mi-sub">'+u.email+'</div></div></div>';
   document.getElementById('homeMenu').innerHTML=menuHtml;
 }
-function doLogout(){session={user:null,data:null,familyData:null,reportTargetId:null};document.getElementById('loginEmail').value='';document.getElementById('loginName').value='';go('s-login',true);showToast('Logged out');}
+function doLogout(){session={user:null,token:null,data:null,familyData:null,reportTargetId:null};document.getElementById('loginEmail').value='';document.getElementById('loginName').value='';go('s-login',true);showToast('Logged out');}
 
 //    ACCOUNTS                                               
 function renderAccounts(){
@@ -849,13 +866,31 @@ function renderSubCatList(){
   document.getElementById('subCatList').innerHTML=MAIN_CATS.map(function(cat){var cats=(d.subCategories&&d.subCategories[cat])||[];return '<div class="card"><div class="card-title">'+cat+'</div><div class="chips">'+cats.map(function(s){return '<div style="display:flex;align-items:center;gap:4px;background:'+(s==='Other'?'#E8F5E9':'#C8E6C9')+';border-radius:100px;padding:5px 12px;border:1px solid #C8E6C9"><span style="font-size:12px;font-weight:700;color:#2E7D32">'+s+'</span>'+(s!=='Other'?'<button onclick="removeSubCat(\''+cat+'\',\''+s+'\')" style="background:none;border:none;color:#D32F2F;font-size:15px;cursor:pointer;padding:0 0 0 3px;line-height:1">x</button>':'')+'</div>';}).join('')+'</div></div>';}).join('');
 }
 
-//    INIT                                                   
+//    INIT
 window.onload=function(){
+  if (isDemo) {
+    document.getElementById('demo-entry').style.display='block';
+    document.getElementById('login-step1').style.display='none';
+  }
   setTimeout(function(){
     document.getElementById('splash').style.display='none';
     showScreen('s-login');
   },1800);
 };
+function tryDemoLogin(){
+  showLoader();
+  apiPost({action:'demoLogin'},function(err,res){
+    hideLoader();
+    if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Demo unavailable right now','error');return;}
+    session.user=res.data;
+    session.token=res.data.token;
+    loadUserData(function(){
+      go('s-home',true);
+      showToast('Welcome to the demo, '+session.user.name+'!');
+      if(session.user.isHead==='true'||session.user.isHead===true) loadFamilyData();
+    });
+  });
+}
 </script>
 </body>
 </html>
