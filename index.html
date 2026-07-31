@@ -1181,12 +1181,40 @@ function renderSubCatList(){
 }
 
 //    INIT
-window.onload=function(){
+window.onload=async function(){
   if (isDemo) {
     document.getElementById('demo-entry').style.display='block';
     document.getElementById('login-step1').style.display='none';
     document.querySelectorAll('.cur-label').forEach(function(el){ el.textContent = DEMO_CURRENCY.symbol.trim(); });
+    setTimeout(function(){ document.getElementById('splash').style.display='none'; showScreen('s-login'); },1800);
+    return;
   }
+
+  // Supabase persists the login session in the browser (localStorage) and
+  // auto-refreshes it - so a returning visitor should NOT need a fresh OTP
+  // every time. Check for a valid existing session before showing the
+  // login screen at all.
+  try {
+    var { data: sessData } = await supabaseClient.auth.getSession();
+    if (sessData && sessData.session) {
+      var me = await requireCurrentUser();
+      var status = await fetchFamilyStatus(me.family_id);
+      document.getElementById('splash').style.display='none';
+      if (status === 'active') {
+        session.user = mapUser(me);
+        loadUserData(function(){
+          go('s-home', true);
+          if (session.user.isHead==='true'||session.user.isHead===true) loadFamilyData();
+        });
+        return;
+      }
+      showScreen('s-login');
+      if (status === 'pending') { document.getElementById('login-step1').style.display='none'; document.getElementById('login-waiting').style.display='block'; }
+      else if (status === 'suspended') { document.getElementById('login-step1').style.display='none'; document.getElementById('login-suspended').style.display='block'; }
+      return;
+    }
+  } catch (e) { /* no valid session yet - fall through to normal login screen */ }
+
   setTimeout(function(){
     document.getElementById('splash').style.display='none';
     showScreen('s-login');
