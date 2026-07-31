@@ -135,6 +135,20 @@ textarea.inp{resize:none;height:72px;}
     <div class="card-title">Try Family Cash Manager</div>
     <div style="font-size:12px;color:#607D8B;margin-bottom:10px">Jump straight into a sample family's dashboard — no sign-up needed.</div>
     <button class="btn-primary" onclick="tryDemoLogin()">Enter Demo</button>
+    <div style="font-size:11px;color:#607D8B;text-align:center;margin-top:12px">Want this for your own family? Email <a href="mailto:vkvcoder.support@gmail.com" style="color:#2E7D32;font-weight:700">vkvcoder.support@gmail.com</a></div>
+  </div>
+  <div class="card" id="how-it-works">
+    <div class="card-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleHowItWorks()">
+      <span>❓ How does this work?</span>
+      <span id="hiw-arrow" style="font-size:14px;transition:transform .2s">▾</span>
+    </div>
+    <div id="hiw-body" style="display:none;font-size:12px;color:#546E7A;line-height:1.6;margin-top:4px">
+      <b>1. Sign in with your Gmail</b> — no password to remember. We email you a 6-digit code each time.<br/>
+      <b>2. Set up your family</b> — the first person becomes the "head" and can invite other members.<br/>
+      <b>3. Track cash, bank & card accounts</b> — log transactions, transfers and monthly reminders, all shared across the family in one place.<br/>
+      <b>4. New family sign-ups are manually approved</b> before full access, to keep everyone's data private and secure.<br/><br/>
+      Questions or want your own family account set up? Contact <a href="mailto:vkvcoder.support@gmail.com" style="color:#2E7D32;font-weight:700">vkvcoder.support@gmail.com</a>
+    </div>
   </div>
   <div class="card" id="login-step1">
     <div class="card-title">Sign In</div>
@@ -1235,6 +1249,13 @@ window.onload=async function(){
     showScreen('s-login');
   },1800);
 };
+function toggleHowItWorks(){
+  var body=document.getElementById('hiw-body');
+  var arrow=document.getElementById('hiw-arrow');
+  var open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  arrow.style.transform=open?'rotate(0deg)':'rotate(180deg)';
+}
 function tryDemoLogin(){
   showLoader();
   apiPost({action:'demoLogin'},function(err,res){
