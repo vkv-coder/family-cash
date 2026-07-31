@@ -151,6 +151,14 @@ textarea.inp{resize:none;height:72px;}
     <button class="btn-primary" id="loginVerifyBtn" onclick="verifyLoginOtp()">Verify & Continue</button>
     <div style="font-size:11px;color:#90A4AE;text-align:center;margin-top:10px;cursor:pointer" onclick="backToLoginStep1()">← Use a different email</div>
   </div>
+  <div class="card" id="login-waiting" style="display:none">
+    <div class="card-title">Awaiting Approval</div>
+    <div style="font-size:12px;color:#607D8B">Your family account has been created and is under review. You'll be able to log in fully once approved — this usually takes a short while. Thanks for your patience!</div>
+  </div>
+  <div class="card" id="login-suspended" style="display:none">
+    <div class="card-title">Account Suspended</div>
+    <div style="font-size:12px;color:#607D8B">This family account is suspended. Contact support: vkvcoder.support@gmail.com</div>
+  </div>
   <div class="warn">First person to sign in becomes Family Head</div>
 </div>
 
@@ -354,15 +362,20 @@ textarea.inp{resize:none;height:72px;}
 
 </div><!-- end #app -->
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-//                                       
-// CONFIG   paste your Apps Script URL here
-//                                       
-var PROD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd98HVYVpC-nRs0d82h5AZxgtPdXEef8SOBYgSXIlJJ8tmaykCKORAhHylduKhSJRP/exec";
-// Paste the demo Apps Script's own /exec URL here once deployed (see family-cash-demo-backend.gs).
-var DEMO_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw7HpAgwCAGb8AoZOCTbQhgszsxy_a5L29WziN6lO72Qr_EbdwajXdBYkZVk1MSUYe9/exec";
+//
+// CONFIG   Supabase (Dhobi-digital project, shared with reminders/consultrack/etc.)
+//
+var SUPABASE_URL = 'https://jqqnnkzozjskziaizajg.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcW5ua3pvempza3ppYWl6YWpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5Mjk1ODAsImV4cCI6MjA4ODUwNTU4MH0.sEYeWnm0dvuw8bLSVnQhqmgV8LB-pELjpuVIa3Us1Gg';
+var supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 var isDemo = new URLSearchParams(location.search).get('demo') === '1';
-var SCRIPT_URL = isDemo ? DEMO_SCRIPT_URL : PROD_SCRIPT_URL;
+// Real Supabase Auth user, RLS-scoped to the is_demo=true family — "Try Demo"
+// just signs in with these known-public credentials via the real auth path.
+var DEMO_EMAIL = 'demo.family@anyapps.in';
+var DEMO_PASSWORD = 'FamDemo-3840943e1841!';
 
 // Demo-only currency auto-detection (UK/international showcase). Real
 // production data stays in actual Rupees regardless of browser locale —
@@ -391,8 +404,7 @@ var SK = 'fcm_session';
 
 // Session (not persisted   re-login on refresh)
 var session = {
-  user: null,        // logged-in user object
-  token: null,       // server-issued session token (v4) — proves who you are
+  user: null,        // logged-in user object (fc_users row, camelCased)
   data: null,        // full user data from server
   familyData: null,  // family summary (Head only)
   reportTargetId: null // Head can view other members
@@ -434,17 +446,273 @@ function dueDateStr(day){
 }
 function nth(d){var s=['th','st','nd','rd'],v=d%100;return s[(v-20)%10]||s[v]||s[0];}
 
-//    API calls                                              
-function apiGet(params, cb) {
-  var p = Object.assign({}, params);
-  if (session.token && !p.token) p.token = session.token;
-  var url = SCRIPT_URL + '?' + Object.keys(p).map(function(k){return k+'='+encodeURIComponent(p[k]);}).join('&');
-  fetch(url).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
-}
+//    API calls (Supabase-backed; keeps the same action-dispatch shape
+//    every screen/render function already calls, so nothing else in
+//    this file needs to change)
+function apiGet(params, cb) { return apiPost(params, cb); }
 function apiPost(body, cb) {
-  var b = Object.assign({}, body);
-  if (session.token && !b.token) b.token = session.token;
-  fetch(SCRIPT_URL, {method:'POST',body:JSON.stringify(b)}).then(function(r){return r.json();}).then(function(d){cb(null,d);}).catch(function(e){cb(e.message,null);});
+  runAction(body).then(function(data){ cb(null, {status:'ok', data:data}); })
+    .catch(function(err){ cb(null, {status:'error', message: (err && err.message) || String(err)}); });
+}
+
+var _fcUser = null; // cached current fc_users row (snake_case, raw from DB)
+
+function mapUser(u){ return {id:u.id, name:u.full_name, email:u.email, isHead:u.is_head?'true':'false', cashOnHand:u.cash_on_hand, createdAt:u.created_at, familyStatus:u._familyStatus}; }
+function mapAccount(a){ return {id:a.id, userId:a.user_id, type:a.type, name:a.name, last4:a.last4, balance:a.balance, createdAt:a.created_at}; }
+function mapTxn(t){ return {id:t.id, userId:t.user_id, date:t.date, fromAccountId:t.from_account_id||'', toAccountId:t.to_account_id||'', amount:t.amount, isTransfer:t.is_transfer?'true':'false', mainCat:t.main_cat, subCat:t.sub_cat, note:t.note, createdAt:t.created_at}; }
+function mapReminder(r){ return {id:r.id, userId:r.user_id, name:r.name, amount:r.amount, dueDay:r.due_day, accountId:r.account_id, active:r.active?'true':'false', createdAt:r.created_at}; }
+
+async function requireCurrentUser() {
+  if (_fcUser) return _fcUser;
+  var { data: authData } = await supabaseClient.auth.getUser();
+  if (!authData || !authData.user) throw new Error('Not logged in');
+  var { data, error } = await supabaseClient.from('fc_users').select('*').eq('auth_uid', authData.user.id).single();
+  if (error || !data) throw new Error('User not found');
+  _fcUser = data;
+  return data;
+}
+
+async function runAction(b) {
+  switch (b.action) {
+    case 'login':            return actionLogin(b);
+    case 'verifyLoginOtp':   return actionVerifyOtp(b);
+    case 'demoLogin':        return actionDemoLogin(b);
+    case 'getUserData':      return actionGetUserData(b);
+    case 'getFamily':        return actionGetFamily(b);
+    case 'saveAccount':      return actionSaveAccount(b);
+    case 'updateBalance':    return actionUpdateBalance(b);
+    case 'updateCashOnHand': return actionUpdateCashOnHand(b);
+    case 'saveTransaction':  return actionSaveTransaction(b);
+    case 'saveReminder':     return actionSaveReminder(b);
+    case 'updateReminder':   return actionUpdateReminder(b);
+    case 'deleteReminder':   return actionDeleteReminder(b);
+    case 'addMember':        return actionAddMember(b);
+    case 'removeMember':     return actionRemoveMember(b);
+    case 'addSubCat':        return actionAddSubCat(b);
+    case 'removeSubCat':     return actionRemoveSubCat(b);
+    case 'updateName':       return actionUpdateName(b);
+    default: throw new Error('Unknown action: ' + b.action);
+  }
+}
+
+async function fetchFamilyStatus(familyId) {
+  var { data } = await supabaseClient.from('fc_families').select('status').eq('id', familyId).maybeSingle();
+  return data ? data.status : 'active';
+}
+
+// ── LOGIN step 1: send OTP (Supabase's own managed email OTP) ─────────
+async function actionLogin(b) {
+  var { error } = await supabaseClient.auth.signInWithOtp({ email: b.email, options: { shouldCreateUser: true } });
+  if (error) throw error;
+  return { otpSent: true };
+}
+
+// ── LOGIN step 2: verify OTP, then find/claim/create the fc_users row ──
+async function actionVerifyOtp(b) {
+  var { data, error } = await supabaseClient.auth.verifyOtp({ email: b.email, token: b.otp, type: 'email' });
+  if (error) throw error;
+  var authUid = data.user.id;
+
+  // Already-linked returning user?
+  var { data: existing } = await supabaseClient.from('fc_users').select('*').eq('auth_uid', authUid).maybeSingle();
+  if (existing) {
+    existing._familyStatus = await fetchFamilyStatus(existing.family_id);
+    _fcUser = existing;
+    return mapUser(existing);
+  }
+
+  // Unclaimed invite waiting for this email (added by a Family Head)?
+  var { data: invited } = await supabaseClient.from('fc_users').select('*').eq('email', b.email).is('auth_uid', null).maybeSingle();
+  if (invited) {
+    var { data: claimed, error: claimErr } = await supabaseClient.from('fc_users')
+      .update({ auth_uid: authUid })
+      .eq('id', invited.id).select().single();
+    if (claimErr) throw claimErr;
+    claimed._familyStatus = await fetchFamilyStatus(claimed.family_id);
+    _fcUser = claimed;
+    return mapUser(claimed);
+  }
+
+  // Brand new signup - create a new (pending) family with self as Head
+  var famId = crypto.randomUUID();
+  var name = (b.name || 'Member').trim();
+  var { error: famErr } = await supabaseClient.from('fc_families')
+    .insert({ id: famId, name: name + "'s Family", status: 'pending' }); // no .select() - avoids the RLS chicken-and-egg on a family with no members yet
+  if (famErr) throw famErr;
+  var { error: userErr } = await supabaseClient.from('fc_users')
+    .insert({ auth_uid: authUid, family_id: famId, full_name: name, email: b.email, is_head: true });
+  if (userErr) throw userErr;
+  var { data: created } = await supabaseClient.from('fc_users').select('*').eq('auth_uid', authUid).single();
+  created._familyStatus = 'pending';
+  _fcUser = created;
+  return mapUser(created);
+}
+
+// ── Try Demo: real Supabase Auth sign-in with known public demo creds ──
+async function actionDemoLogin(b) {
+  var { data, error } = await supabaseClient.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+  if (error) throw error;
+  var { data: fcRow, error: rowErr } = await supabaseClient.from('fc_users').select('*').eq('auth_uid', data.user.id).single();
+  if (rowErr) throw rowErr;
+  fcRow._familyStatus = 'active';
+  _fcUser = fcRow;
+  return mapUser(fcRow);
+}
+
+// ── GET USER DATA ──────────────────────────────────────────────────────
+async function actionGetUserData(b) {
+  var me = await requireCurrentUser();
+  var targetId = b.targetId || me.id;
+  var { data: target } = await supabaseClient.from('fc_users').select('*').eq('id', targetId).maybeSingle();
+  if (!target) throw new Error('Not authorized');
+  var { data: accounts } = await supabaseClient.from('fc_accounts').select('*').eq('user_id', targetId);
+  var { data: txns } = await supabaseClient.from('fc_transactions').select('*').eq('user_id', targetId).order('date', { ascending: false }).limit(500);
+  var { data: reminders } = await supabaseClient.from('fc_reminders').select('*').eq('user_id', targetId);
+  var { data: subs } = await supabaseClient.from('fc_sub_categories').select('*').or('family_id.is.null,family_id.eq.' + me.family_id);
+  var subCats = {};
+  (subs || []).forEach(function(s){
+    if (!subCats[s.main_cat]) subCats[s.main_cat] = [];
+    if (subCats[s.main_cat].indexOf(s.sub_cat) === -1) subCats[s.main_cat].push(s.sub_cat);
+  });
+  return {
+    user: mapUser(target),
+    accounts: (accounts || []).map(mapAccount),
+    transactions: (txns || []).map(mapTxn),
+    reminders: (reminders || []).map(mapReminder),
+    subCategories: subCats
+  };
+}
+
+// ── GET FAMILY (Head-only net worth summary) ───────────────────────────
+async function actionGetFamily(b) {
+  var me = await requireCurrentUser();
+  if (!me.is_head) throw new Error('Not authorized');
+  var { data: users } = await supabaseClient.from('fc_users').select('id,full_name,email,is_head,cash_on_hand,auth_uid').eq('family_id', me.family_id);
+  var { data: accounts } = await supabaseClient.from('fc_accounts').select('user_id,type,balance').eq('family_id', me.family_id);
+  return (users || []).map(function(u){
+    var ua = (accounts || []).filter(function(a){ return a.user_id === u.id; });
+    var banks = ua.filter(function(a){ return a.type === 'bank'; }).reduce(function(s,a){ return s + Number(a.balance); }, 0);
+    var cards = ua.filter(function(a){ return a.type === 'card'; }).reduce(function(s,a){ return s + Number(a.balance); }, 0);
+    var cash = Number(u.cash_on_hand) || 0;
+    return { id: u.id, name: u.full_name, email: u.email, isHead: u.is_head ? 'true' : 'false', hasJoined: u.auth_uid ? 'true' : 'false', netWorth: banks + cards + cash, banks: banks, cards: cards, cash: cash };
+  });
+}
+
+// ── SAVE ACCOUNT ────────────────────────────────────────────────────────
+async function actionSaveAccount(b) {
+  var me = await requireCurrentUser();
+  var { data, error } = await supabaseClient.from('fc_accounts').insert({
+    family_id: me.family_id, user_id: me.id, type: b.type, name: b.name || '',
+    last4: b.last4 || '0000', balance: Number(b.balance) || 0
+  }).select('id').single();
+  if (error) throw error;
+  return { id: data.id };
+}
+
+// ── UPDATE BALANCE ──────────────────────────────────────────────────────
+async function actionUpdateBalance(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_accounts').update({ balance: Number(b.balance) }).eq('id', b.accountId).eq('user_id', me.id);
+  if (error) throw error;
+  return 'updated';
+}
+
+// ── UPDATE CASH ON HAND ─────────────────────────────────────────────────
+async function actionUpdateCashOnHand(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_users').update({ cash_on_hand: Number(b.cashOnHand) || 0 }).eq('id', me.id);
+  if (error) throw error;
+  return 'updated';
+}
+
+async function applyDelta(userId, accId, delta) {
+  if (!delta) return;
+  if (accId === 'cash') {
+    var { data: u } = await supabaseClient.from('fc_users').select('cash_on_hand').eq('id', userId).single();
+    await supabaseClient.from('fc_users').update({ cash_on_hand: (Number(u.cash_on_hand) || 0) + delta }).eq('id', userId);
+  } else {
+    var { data: a } = await supabaseClient.from('fc_accounts').select('balance').eq('id', accId).eq('user_id', userId).single();
+    await supabaseClient.from('fc_accounts').update({ balance: (Number(a.balance) || 0) + delta }).eq('id', accId).eq('user_id', userId);
+  }
+}
+
+// ── SAVE TRANSACTION ─────────────────────────────────────────────────────
+async function actionSaveTransaction(b) {
+  var me = await requireCurrentUser();
+  var { data, error } = await supabaseClient.from('fc_transactions').insert({
+    family_id: me.family_id, user_id: me.id, date: b.date,
+    from_account_id: b.fromAccountId || null, to_account_id: b.toAccountId || null,
+    amount: Number(b.amount), is_transfer: !!b.isTransfer,
+    main_cat: b.mainCat || '', sub_cat: b.subCat || '', note: b.note || ''
+  }).select('id').single();
+  if (error) throw error;
+  if (b.fromAccountId && Number(b.fromDelta)) await applyDelta(me.id, b.fromAccountId, Number(b.fromDelta));
+  if (b.toAccountId && Number(b.toDelta)) await applyDelta(me.id, b.toAccountId, Number(b.toDelta));
+  return { id: data.id };
+}
+
+// ── REMINDERS ─────────────────────────────────────────────────────────
+async function actionSaveReminder(b) {
+  var me = await requireCurrentUser();
+  var { data, error } = await supabaseClient.from('fc_reminders').insert({
+    family_id: me.family_id, user_id: me.id, name: b.name, amount: Number(b.amount),
+    due_day: Number(b.dueDay), account_id: b.accountId, active: true
+  }).select('id').single();
+  if (error) throw error;
+  return { id: data.id };
+}
+async function actionUpdateReminder(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_reminders').update({ active: !!b.active }).eq('id', b.id).eq('user_id', me.id);
+  if (error) throw error;
+  return 'updated';
+}
+async function actionDeleteReminder(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_reminders').delete().eq('id', b.id).eq('user_id', me.id);
+  if (error) throw error;
+  return 'deleted';
+}
+
+// ── MEMBERS (Head only) ─────────────────────────────────────────────────
+async function actionAddMember(b) {
+  var me = await requireCurrentUser();
+  var email = (b.email || '').toLowerCase().trim();
+  var { data: existing } = await supabaseClient.from('fc_users').select('id').eq('email', email).maybeSingle();
+  if (existing) throw new Error('Email already registered');
+  var { data, error } = await supabaseClient.from('fc_users').insert({
+    family_id: me.family_id, full_name: b.name, email: email, is_head: false, auth_uid: null
+  }).select('id').single();
+  if (error) throw error;
+  return { id: data.id, name: b.name, email: email };
+}
+async function actionRemoveMember(b) {
+  await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_users').delete().eq('id', b.memberId);
+  if (error) throw error;
+  return 'removed';
+}
+
+// ── SUB CATEGORIES ───────────────────────────────────────────────────────
+async function actionAddSubCat(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_sub_categories').insert({ family_id: me.family_id, main_cat: b.mainCat, sub_cat: b.subCat });
+  if (error) throw error;
+  return 'added';
+}
+async function actionRemoveSubCat(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_sub_categories').delete().eq('family_id', me.family_id).eq('main_cat', b.mainCat).eq('sub_cat', b.subCat);
+  if (error) throw error;
+  return 'removed';
+}
+
+// ── UPDATE NAME ───────────────────────────────────────────────────────
+async function actionUpdateName(b) {
+  var me = await requireCurrentUser();
+  var { error } = await supabaseClient.from('fc_users').update({ full_name: b.name }).eq('id', me.id);
+  if (error) throw error;
+  return 'updated';
 }
 
 //    Navigation                                             
@@ -503,8 +771,19 @@ function verifyLoginOtp(){
   apiPost({action:'verifyLoginOtp',email:_loginEmail,otp:otp},function(err,res){
     hideLoader();
     if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Verification failed','error');return;}
+    if (res.data.familyStatus === 'pending') {
+      document.getElementById('login-step1').style.display='none';
+      document.getElementById('login-step2').style.display='none';
+      document.getElementById('login-waiting').style.display='block';
+      return;
+    }
+    if (res.data.familyStatus === 'suspended') {
+      document.getElementById('login-step1').style.display='none';
+      document.getElementById('login-step2').style.display='none';
+      document.getElementById('login-suspended').style.display='block';
+      return;
+    }
     session.user=res.data;
-    session.token=res.data.token;
     loadUserData(function(){
       go('s-home',true);
       showToast('Welcome, '+session.user.name+'!');
@@ -596,7 +875,16 @@ function renderHome(){
   menuHtml+='<div class="mi" onclick="doLogout()"><div class="mi-icon" style="background:#FFEBEE"> </div><div style="flex:1"><div class="mi-title" style="color:#D32F2F">Log Out</div><div class="mi-sub">'+u.email+'</div></div></div>';
   document.getElementById('homeMenu').innerHTML=menuHtml;
 }
-function doLogout(){session={user:null,token:null,data:null,familyData:null,reportTargetId:null};document.getElementById('loginEmail').value='';document.getElementById('loginName').value='';go('s-login',true);showToast('Logged out');}
+function doLogout(){
+  supabaseClient.auth.signOut();
+  _fcUser=null;
+  session={user:null,data:null,familyData:null,reportTargetId:null};
+  document.getElementById('loginEmail').value='';document.getElementById('loginName').value='';
+  document.getElementById('login-waiting').style.display='none';
+  document.getElementById('login-suspended').style.display='none';
+  document.getElementById('login-step1').style.display=isDemo?'none':'block';
+  go('s-login',true);showToast('Logged out');
+}
 
 //    ACCOUNTS                                               
 function renderAccounts(){
@@ -836,7 +1124,7 @@ function renderFamily(){
   var fd=session.familyData;
   var html='';
   if(!fd||fd.length===0){html='<div class="empty"><div class="ico">     </div><div class="etitle">No members yet</div></div>';}
-  else{fd.forEach(function(m){var nw=Number(m.netWorth)||0;html+='<div class="mem-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">'+(m.isHead==='true'?' ':' ')+'</div><div style="flex:1"><div style="font-size:14px;font-weight:800;color:#1B5E20">'+m.name+(m.isHead==='true'?' <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:100px">Head</span>':'')+'</div><div style="font-size:11px;color:#90A4AE">'+m.email+'</div></div><div style="text-align:right"><div style="font-size:10px;color:#90A4AE">Net Worth</div><div style="font-size:16px;font-weight:900;color:'+(nw<0?'#D32F2F':'#1B5E20')+'">'+(nw<0?'-':'')+fmt(nw)+'</div></div></div><div style="display:flex;gap:16px;border-top:1px solid #E8F5E9;padding-top:8px"><div><div style="font-size:10px;color:#90A4AE">Banks</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.banks)+'</div></div><div><div style="font-size:10px;color:#90A4AE">CC Debt</div><div style="font-size:12px;font-weight:800;color:#D32F2F">'+fmt(m.cards)+'</div></div><div><div style="font-size:10px;color:#90A4AE">Cash</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.cash)+'</div></div></div>'+(m.isHead!=='true'?'<button onclick="removeMember(\''+m.id+'\',\''+m.name+'\')" style="margin-top:10px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:9px;padding:7px 14px;color:#D32F2F;font-size:12px;font-weight:700;cursor:pointer;width:100%">Remove Member</button>':'')+'</div>';});}
+  else{fd.forEach(function(m){var nw=Number(m.netWorth)||0;html+='<div class="mem-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="font-size:32px">'+(m.isHead==='true'?' ':' ')+'</div><div style="flex:1"><div style="font-size:14px;font-weight:800;color:#1B5E20">'+m.name+(m.isHead==='true'?' <span style="font-size:10px;background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:100px">Head</span>':'')+(m.isHead!=='true'&&m.hasJoined!=='true'?' <span style="font-size:10px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:100px">Invited</span>':'')+'</div><div style="font-size:11px;color:#90A4AE">'+m.email+'</div></div><div style="text-align:right"><div style="font-size:10px;color:#90A4AE">Net Worth</div><div style="font-size:16px;font-weight:900;color:'+(nw<0?'#D32F2F':'#1B5E20')+'">'+(nw<0?'-':'')+fmt(nw)+'</div></div></div><div style="display:flex;gap:16px;border-top:1px solid #E8F5E9;padding-top:8px"><div><div style="font-size:10px;color:#90A4AE">Banks</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.banks)+'</div></div><div><div style="font-size:10px;color:#90A4AE">CC Debt</div><div style="font-size:12px;font-weight:800;color:#D32F2F">'+fmt(m.cards)+'</div></div><div><div style="font-size:10px;color:#90A4AE">Cash</div><div style="font-size:12px;font-weight:800;color:#2E7D32">'+fmt(m.cash)+'</div></div></div>'+(m.isHead!=='true'?'<button onclick="removeMember(\''+m.id+'\',\''+m.name+'\')" style="margin-top:10px;background:#FFEBEE;border:1px solid #FFCDD2;border-radius:9px;padding:7px 14px;color:#D32F2F;font-size:12px;font-weight:700;cursor:pointer;width:100%">Remove Member</button>':'')+'</div>';});}
   document.getElementById('familyMembersList').innerHTML=html;
 }
 function saveMember(){
@@ -847,7 +1135,7 @@ function saveMember(){
   apiPost({action:'addMember',name:name,email:email},function(err,res){
     hideLoader();if(err||res.status!=='ok'){showToast(res&&res.message||'Failed','error');return;}
     document.getElementById('memName').value='';document.getElementById('memEmail').value='';
-    loadFamilyData();setTimeout(function(){renderFamily();showToast(name+' added!');},600);
+    loadFamilyData();setTimeout(function(){renderFamily();showToast(name+' added — ask them to sign in with their email to activate access');},600);
   });
 }
 function removeMember(id,name){
@@ -910,7 +1198,6 @@ function tryDemoLogin(){
     hideLoader();
     if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Demo unavailable right now','error');return;}
     session.user=res.data;
-    session.token=res.data.token;
     loadUserData(function(){
       go('s-home',true);
       showToast('Welcome to the demo, '+session.user.name+'!');
