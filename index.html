@@ -545,7 +545,22 @@ async function actionVerifyOtp(b) {
   var { data: created } = await supabaseClient.from('fc_users').select('*').eq('auth_uid', authUid).single();
   created._familyStatus = 'pending';
   _fcUser = created;
+  notifyOwnerOfSignup(name, b.email);
   return mapUser(created);
+}
+
+// Best-effort Telegram alert to the app owner so a new pending signup
+// doesn't just sit unnoticed in Supabase Studio. Reuses the same
+// secure send-telegram Edge Function already deployed for reminders
+// (token lives server-side as a secret, never shipped to the browser).
+function notifyOwnerOfSignup(name, email) {
+  try {
+    fetch(SUPABASE_URL + '/functions/v1/send-telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ chat_id: '8507770594', text: 'family-cash: new signup awaiting approval - ' + name + ' (' + email + '). Approve in Supabase Studio: fc_families, set status to active.' })
+    }).catch(function(){});
+  } catch (e) { /* never block signup on a notification failure */ }
 }
 
 // ── Try Demo: real Supabase Auth sign-in with known public demo creds ──
