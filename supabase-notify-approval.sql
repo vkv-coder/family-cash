@@ -26,6 +26,7 @@ begin
         body := jsonb_build_object(
           'action', 'sendEmail',
           'to', v_email,
+          'fromName', 'Family Cash',
           'subject', 'Your Family Cash account is approved',
           'html', '<p>Hi,</p>'
             || '<p>Your family account <b>' || coalesce(NEW.name, '') || '</b> has been approved on Family Cash. You can now log in and start using the app:</p>'
