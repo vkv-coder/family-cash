@@ -141,7 +141,10 @@ textarea.inp{resize:none;height:72px;}
     <div style="background:#FFF3E0;color:#E65100;font-weight:800;font-size:12px;text-align:center;padding:6px;border-radius:6px;margin-bottom:12px">🧪 DEMO MODE — sample data, resets nightly</div>
     <div class="card-title">Try Family Cash Manager</div>
     <div style="font-size:12px;color:#607D8B;margin-bottom:10px">Jump straight into a sample family's dashboard — no sign-up needed.</div>
-    <button class="btn-primary" onclick="tryDemoLogin()">Enter Demo</button>
+    <div class="fg"><label class="lbl">Your Name</label><input class="inp" type="text" id="demoName" placeholder="Your name"/></div>
+    <div class="fg"><label class="lbl">Your Phone Number</label><input class="inp" type="tel" id="demoPhone" placeholder="10-digit mobile number" maxlength="10"/></div>
+    <button class="btn-primary" id="demoEnterBtn" onclick="enterDemoGated()">Enter Demo</button>
+    <div id="demoGateMsg" style="font-size:11px;color:#D32F2F;text-align:center;margin-top:6px"></div>
     <div style="font-size:11px;color:#607D8B;text-align:center;margin-top:12px">Want this for your own family? Email <a href="mailto:vkvcoder.support@gmail.com" style="color:#2E7D32;font-weight:700">vkvcoder.support@gmail.com</a></div>
   </div>
   <div class="card" id="how-it-works">
@@ -195,6 +198,15 @@ textarea.inp{resize:none;height:72px;}
   <div class="nw-bar" id="homeNW"></div>
   <div id="dueBanner"></div>
   <div style="padding-top:8px" id="homeMenu"></div>
+</div>
+
+<!-- DEMO ORIENTATION (demo-mode only, see renderHome/renderGuide) -->
+<div class="screen" id="s-guide">
+  <div class="hdr-sm">
+    <button class="back-btn" onclick="goBack()">&#8592;</button>
+    <div class="title">How This Works</div>
+  </div>
+  <div id="guideBody" style="padding-top:8px;padding-bottom:16px"></div>
 </div>
 
 <!-- ACCOUNTS -->
@@ -768,6 +780,7 @@ function go(id,resetStack){
   else if(id==='s-settings')renderSettings();
   else if(id==='s-newTxn')renderTxnForm();
   else if(id==='s-family')renderFamily();
+  else if(id==='s-guide')renderGuide();
 }
 function goBack(){
   var prev=navStack.length>0?navStack.pop():(session.user?'s-home':'s-login');
@@ -778,6 +791,7 @@ function goBack(){
   else if(prev==='s-reports')renderReports();
   else if(prev==='s-settings')renderSettings();
   else if(prev==='s-family')renderFamily();
+  else if(prev==='s-guide')renderGuide();
 }
 
 //    LOGIN
@@ -903,13 +917,65 @@ function renderHome(){
 
   var activeRem=(d.reminders||[]).filter(function(r){return r.active==='true'||r.active===true;}).length;
   var dueCount=due.length;
-  var menuHtml='<div class="mi" onclick="go(\'s-accounts\')"><div class="mi-icon" style="background:#E8F5E9"> </div><div style="flex:1"><div class="mi-title">Accounts</div><div class="mi-sub">'+((d.accounts||[]).length+1)+' accounts</div></div><div class="mi-arrow">&rsaquo;</div></div>';
+  var menuHtml=isDemo?'<div class="mi" onclick="go(\'s-guide\')"><div class="mi-icon" style="background:#E3F2FD">ℹ️</div><div style="flex:1"><div class="mi-title">How This Works</div><div class="mi-sub">Demo orientation</div></div><div class="mi-arrow">&rsaquo;</div></div>':'';
+  menuHtml+='<div class="mi" onclick="go(\'s-accounts\')"><div class="mi-icon" style="background:#E8F5E9"> </div><div style="flex:1"><div class="mi-title">Accounts</div><div class="mi-sub">'+((d.accounts||[]).length+1)+' accounts</div></div><div class="mi-arrow">&rsaquo;</div></div>';
   menuHtml+='<div class="mi" onclick="go(\'s-reports\')"><div class="mi-icon" style="background:#F3E5F5"> </div><div style="flex:1"><div class="mi-title">Reports</div><div class="mi-sub">Expenses &amp; income</div></div><div class="mi-arrow">&rsaquo;</div></div>';
   menuHtml+='<div class="mi" onclick="go(\'s-reminders\')"><div class="mi-icon" style="background:#FFF8E1"> </div><div style="flex:1"><div class="mi-title">EMI &amp; Reminders</div><div class="mi-sub">'+activeRem+' active</div></div>'+(dueCount>0?'<div class="mi-badge">'+dueCount+' Due</div>':'<div class="mi-arrow">&rsaquo;</div>')+'</div>';
   if(isHead) menuHtml+='<div class="mi" onclick="go(\'s-family\')"><div class="mi-icon" style="background:#E8F5E9">     </div><div style="flex:1"><div class="mi-title">Manage Family</div><div class="mi-sub">Add &amp; view members</div></div><div class="mi-arrow">&rsaquo;</div></div>';
   menuHtml+='<div class="mi" onclick="go(\'s-settings\')"><div class="mi-icon" style="background:#FFF3E0">  </div><div style="flex:1"><div class="mi-title">Settings</div><div class="mi-sub">Edit name &middot; Sub-categories</div></div><div class="mi-arrow">&rsaquo;</div></div>';
   menuHtml+='<div class="mi" onclick="doLogout()"><div class="mi-icon" style="background:#FFEBEE"> </div><div style="flex:1"><div class="mi-title" style="color:#D32F2F">Log Out</div><div class="mi-sub">'+u.email+'</div></div></div>';
   document.getElementById('homeMenu').innerHTML=menuHtml;
+}
+// ========== DEMO ORIENTATION SCREEN (demo-mode only, see renderHome) ==========
+function renderGuide(){
+  document.getElementById('guideBody').innerHTML = `
+    <div class="card">
+      <div class="card-title">👋 Welcome — How This Demo Works</div>
+      <p style="font-size:13.5px;line-height:1.7;">
+        Family Cash Manager is a shared dashboard for tracking your whole family's
+        cash, bank and card accounts in one place — who spent what, on which
+        account, and where the money is sitting right now. You're looking at a
+        sample family already filled in with real-looking accounts and
+        transactions, so you can click around and see exactly what your own
+        family's data would look like.
+      </p>
+      <p style="font-size:13.5px;line-height:1.7;background:#FFF3E0;color:#E65100;padding:8px 10px;border-radius:8px;font-weight:600;">
+        🧪 This is sample data and resets nightly. Explore freely — add a
+        transaction, edit a balance, try anything. Nothing here ever touches a
+        real family's data.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✅ Things to try</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <strong>💰 Accounts</strong>
+          <div style="font-size:12.5px;color:#607D8B;">See the sample bank, card and cash accounts already set up, with real running balances. Add a new account of your own.</div>
+        </div>
+        <div>
+          <strong>📊 Reports</strong>
+          <div style="font-size:12.5px;color:#607D8B;">Browse expenses and income broken down by category — exactly what you'd check at the end of the month.</div>
+        </div>
+        <div>
+          <strong>⏰ EMI &amp; Reminders</strong>
+          <div style="font-size:12.5px;color:#607D8B;">See upcoming payment reminders and how the "Payments Due Soon" banner works on the home screen.</div>
+        </div>
+        <div>
+          <strong>👪 Manage Family</strong>
+          <div style="font-size:12.5px;color:#607D8B;">As the sample family head, see how members get added and how shared visibility works across accounts.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🙏 Want this for your own family?</div>
+      <p style="font-size:13px;line-height:1.6;">No approval was needed for this demo — but to actually track your own family's finances, you'll sign up with your Gmail (quick, no password) and it gets approved so your data stays private to only your own family.</p>
+      <p style="font-size:13px;line-height:1.8;">
+        📧 <strong>vkvcoder.support@gmail.com</strong>
+      </p>
+    </div>
+  `;
 }
 function doLogout(){
   supabaseClient.auth.signOut();
@@ -1263,14 +1329,46 @@ function toggleHowItWorks(){
   body.style.display=open?'none':'block';
   arrow.style.transform=open?'rotate(0deg)':'rotate(180deg)';
 }
+// Best-effort Telegram alert for a new demo trial, reusing the same
+// secure send-telegram Edge Function as notifyOwnerOfSignup — never
+// blocks demo entry if it fails (offline, function down, etc.)
+function notifyDemoTrial(name,phone){
+  try{
+    fetch(SUPABASE_URL+'/functions/v1/send-telegram',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON_KEY,'apikey':SUPABASE_ANON_KEY},
+      body:JSON.stringify({chat_id:'8507770594',text:'family-cash: new demo trial - '+name+' ('+phone+')'})
+    }).catch(function(){});
+  }catch(e){}
+}
+function enterDemoGated(){
+  var name=document.getElementById('demoName').value.trim();
+  var phone=document.getElementById('demoPhone').value.trim();
+  var msgEl=document.getElementById('demoGateMsg');
+  msgEl.textContent='';
+  if(!name){msgEl.textContent='Please enter your name.';return;}
+  if(phone.length!==10||!/^[0-9]+$/.test(phone)){msgEl.textContent='Enter a valid 10-digit phone number.';return;}
+  var btn=document.getElementById('demoEnterBtn');
+  btn.disabled=true;btn.textContent='Loading...';
+  supabaseClient.from('fc_demo_visitors').insert({name:name,phone:phone}).then(function(){
+    notifyDemoTrial(name,phone);
+    tryDemoLogin();
+  }).catch(function(){
+    // Logging the visit is best-effort — demo still proceeds even if it fails
+    notifyDemoTrial(name,phone);
+    tryDemoLogin();
+  });
+}
 function tryDemoLogin(){
   showLoader();
   apiPost({action:'demoLogin'},function(err,res){
     hideLoader();
+    var btn=document.getElementById('demoEnterBtn');
+    if(btn){btn.disabled=false;btn.textContent='Enter Demo';}
     if(err||!res||res.status!=='ok'){showToast((res&&res.message)||err||'Demo unavailable right now','error');return;}
     session.user=res.data;
     loadUserData(function(){
-      go('s-home',true);
+      go('s-guide',true);
       showToast('Welcome to the demo, '+session.user.name+'!');
       if(session.user.isHead==='true'||session.user.isHead===true) loadFamilyData();
     });
