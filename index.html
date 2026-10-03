@@ -535,7 +535,7 @@ async function fetchFamilyStatus(familyId) {
 
 // ── LOGIN step 1: send OTP (Supabase's own managed email OTP) ─────────
 async function actionLogin(b) {
-  var { error } = await supabaseClient.auth.signInWithOtp({ email: b.email, options: { shouldCreateUser: true } });
+  var { error } = await supabaseClient.auth.signInWithOtp({ email: b.email, options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + window.location.pathname } });
   if (error) throw error;
   return { otpSent: true };
 }
